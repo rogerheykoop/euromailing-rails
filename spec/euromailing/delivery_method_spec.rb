@@ -54,6 +54,20 @@ RSpec.describe Euromailing::DeliveryMethod do
     expect(stub).to have_been_requested
   end
 
+  it "passes content_id (without angle brackets) for inline CID attachments" do
+    mail.attachments.inline["logo.png"] = "PNG-fake"
+    stub = stub_request(:post, "https://euromailing.com/api/v1/transactional_emails")
+      .with { |req|
+        att = JSON.parse(req.body)["attachments"].first
+        cid = att["content_id"]
+        att["filename"] == "logo.png" && !cid.to_s.empty? && !cid.include?("<") && !cid.include?(">")
+      }
+      .to_return(status: 202, body: "{}")
+
+    described_class.new.deliver!(mail)
+    expect(stub).to have_been_requested
+  end
+
   it "refuses multi-recipient mail" do
     mail.to = ["a@example.com", "b@example.com"]
     expect { described_class.new.deliver!(mail) }

@@ -19,6 +19,11 @@ module Euromailing
     end
 
     def deliver!(mail)
+      # Assigns content-ids to inline attachments and finalizes parts —
+      # Mail normally does this during encoding, but we read the message
+      # fields before that point. Idempotent.
+      mail.ready_to_send!
+
       recipients = Array(mail.to)
       unless recipients.size == 1
         raise DeliveryError,
@@ -63,11 +68,18 @@ module Euromailing
       return nil if mail.attachments.empty?
 
       mail.attachments.map do |attachment|
-        {
+        serialized = {
           filename:     attachment.filename,
           content_type: attachment.mime_type,
           content:      Base64.strict_encode64(attachment.body.decoded)
         }
+        # ActionMailer's attachments.inline[...] become CID images: pass
+        # the content id (sans Mail's angle brackets) so the API builds a
+        # multipart/related message and <img src="cid:..."> resolves.
+        if attachment.inline? && attachment.content_id
+          serialized[:content_id] = attachment.content_id.gsub(/\A<|>\z/, "")
+        end
+        serialized
       end
     end
   end
