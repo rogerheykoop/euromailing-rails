@@ -55,6 +55,41 @@ module Euromailing
       request(:get, "/api/v1/lists")
     end
 
+    # -- Sending domains -----------------------------------------------
+    #
+    # For partner integrations that send on behalf of customer domains
+    # (one account, many domains, one key with the
+    # transactional:send_any_domain scope). Euromailing is the source of
+    # truth for verification: create a domain, show the customer the DNS
+    # records it returns, then poll status / trigger verify — never check
+    # the customer's DNS yourself.
+    #
+    # Requires the sending_domains:read / sending_domains:write scopes.
+
+    # Returns the domain plus ready-made `dns_records` (DKIM CNAME, SPF
+    # include with a separate `include_token`, DMARC), with Dutch notes.
+    def create_sending_domain(domain)
+      request(:post, "/api/v1/sending_domains", domain: domain)
+    end
+
+    # Current verification status: `verified` plus a per-record breakdown.
+    def sending_domain(domain)
+      request(:get, "/api/v1/sending_domains/#{domain}")
+    end
+
+    # Triggers a fresh DNS check and returns the updated status.
+    def verify_sending_domain(domain)
+      request(:post, "/api/v1/sending_domains/#{domain}/verify")
+    end
+
+    def delete_sending_domain(domain)
+      request(:delete, "/api/v1/sending_domains/#{domain}")
+    end
+
+    def sending_domains
+      request(:get, "/api/v1/sending_domains")
+    end
+
     private
 
     def request(method, path, payload = nil)

@@ -82,6 +82,62 @@ RSpec.describe Euromailing::Client do
     end
   end
 
+  describe "sending domains" do
+    it "creates a sending domain and returns DNS instructions" do
+      stub = stub_request(:post, "https://euromailing.com/api/v1/sending_domains")
+        .with(body: { domain: "coachklant.nl" }.to_json)
+        .to_return(status: 201, body: {
+          domain: "coachklant.nl", status: "pending",
+          dns_records: [{ purpose: "dkim", type: "CNAME" }]
+        }.to_json)
+
+      result = client.create_sending_domain("coachklant.nl")
+      expect(stub).to have_been_requested
+      expect(result["status"]).to eq("pending")
+      expect(result["dns_records"].first["purpose"]).to eq("dkim")
+    end
+
+    it "fetches verification status by domain" do
+      stub = stub_request(:get, "https://euromailing.com/api/v1/sending_domains/coachklant.nl")
+        .to_return(status: 200, body: { domain: "coachklant.nl", verified: false }.to_json)
+
+      expect(client.sending_domain("coachklant.nl")["verified"]).to be(false)
+      expect(stub).to have_been_requested
+    end
+
+    it "triggers a fresh verification" do
+      stub = stub_request(:post, "https://euromailing.com/api/v1/sending_domains/coachklant.nl/verify")
+        .to_return(status: 200, body: { verified: true }.to_json)
+
+      expect(client.verify_sending_domain("coachklant.nl")["verified"]).to be(true)
+      expect(stub).to have_been_requested
+    end
+
+    it "deletes a sending domain (204 -> nil)" do
+      stub = stub_request(:delete, "https://euromailing.com/api/v1/sending_domains/coachklant.nl")
+        .to_return(status: 204)
+
+      expect(client.delete_sending_domain("coachklant.nl")).to be_nil
+      expect(stub).to have_been_requested
+    end
+
+    it "lists sending domains" do
+      stub = stub_request(:get, "https://euromailing.com/api/v1/sending_domains")
+        .to_return(status: 200, body: "[]")
+
+      expect(client.sending_domains).to eq([])
+      expect(stub).to have_been_requested
+    end
+
+    it "surfaces from_domain_not_on_account as an ApiError" do
+      stub_request(:post, "https://euromailing.com/api/v1/sending_domains")
+        .to_return(status: 422, body: { error: { code: "validation_failed", message: "bad" } }.to_json)
+
+      expect { client.create_sending_domain("x") }
+        .to raise_error(Euromailing::ApiError) { |e| expect(e.status).to eq(422) }
+    end
+  end
+
   it "raises ConfigurationError without an api_key" do
     Euromailing.reset!
     expect {

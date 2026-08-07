@@ -65,7 +65,35 @@ client.lists  # => [{ "id" => …, "name" => … }, …]
 All methods raise `Euromailing::ApiError` (with `#status` and `#code`)
 on failure.
 
-## 3. User sync
+## 3. Sending domains (send as your customers' domains)
+
+For a partner integration — one Euromailing account, many customer
+domains, one API key with the `transactional:send_any_domain` and
+`sending_domains:read|write` scopes. Euromailing is the source of truth
+for DNS verification; you show the records and poll status, you don't
+check DNS yourself.
+
+```ruby
+client = Euromailing.client
+
+# 1. Create the domain. Euromailing returns ready-made DNS records:
+#    a single DKIM CNAME, an SPF include token (add to the customer's
+#    existing v=spf1 record — never a second one), and a DMARC record.
+dom = client.create_sending_domain("coachklant.nl")
+dom["dns_records"] # => [{ "purpose" => "dkim", "type" => "CNAME", "host" => …, "value" => … }, …]
+
+# 2. Show those records to the customer to add at their registrar.
+#    Then poll, or trigger a fresh check:
+client.sending_domain("coachklant.nl")          # => { "verified" => false, "records" => [...] }
+client.verify_sending_domain("coachklant.nl")   # runs a fresh DNS check
+
+# 3. Once verified, send from any address on that domain with the same key:
+UserMailer.welcome(user).deliver_later          # from: "coach@coachklant.nl"
+
+client.delete_sending_domain("coachklant.nl")   # when a customer leaves
+```
+
+## 4. User sync
 
 Mirror your users as Euromailing contacts — creates/updates upsert,
 destroys delete, all in background jobs:
@@ -85,7 +113,7 @@ end
 `Euromailing::SyncJob` retries on API errors (5 attempts, polynomial
 backoff) and treats a 404 on delete as success.
 
-## 4. Inbound mail (ActionMailbox)
+## 5. Inbound mail (ActionMailbox)
 
 Euromailing pushes the raw mail to your app's standard ActionMailbox
 relay ingress — no custom webhook code, just Rails:
