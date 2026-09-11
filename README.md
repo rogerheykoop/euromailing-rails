@@ -42,6 +42,18 @@ class PasswordMailer < ApplicationMailer
 end
 ```
 
+To tie a later bounce back to your own records, set a metadata header on
+the mail — the gem sends its contents as the API's `metadata` field and
+Euromailing echoes it verbatim in the bounce and complaint webhooks:
+
+```ruby
+headers["X-Euromailing-Metadata"] = { account_id: account.id }.to_json
+```
+
+Do not use the `id` from the send response for this: that is the RFC
+Message-ID, while the `message_id` in a webhook is the mail server's own
+queue id. They are not the same value.
+
 One recipient per message; prefer `deliver_later` (the API allows 60
 requests/minute per key, and ActiveJob retries give you backoff).
 Transactional mail carries no unsubscribe headers, and recipients who

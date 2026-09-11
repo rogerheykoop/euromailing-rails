@@ -15,12 +15,19 @@ module Euromailing
 
     # Send one transactional message. Requires an API key with the
     # transactional:send scope, bound to the from-address's domain.
+    # `metadata` is een vrij object dat Euromailing verbatim teruggeeft in de
+    # bounce- en complaint-webhooks. Dat is de manier om een bounce aan je eigen
+    # administratie te knopen: de `id` uit de verzendrespons is de RFC
+    # Message-ID, terwijl de `message_id` in een webhook de interne queue-id van
+    # de mailserver is. Die twee zijn niet hetzelfde.
     def deliver_transactional(from:, to:, subject:, html_body: nil, text_body: nil,
-                              reply_to: nil, headers: nil, attachments: nil)
+                              reply_to: nil, headers: nil, attachments: nil,
+                              metadata: nil)
       payload = {
         from: from, to: to, subject: subject,
         html_body: html_body, text_body: text_body,
-        reply_to: reply_to, headers: headers, attachments: attachments
+        reply_to: reply_to, headers: headers, attachments: attachments,
+        metadata: metadata
       }.reject { |_k, v| v.nil? }
 
       request(:post, "/api/v1/transactional_emails", payload)

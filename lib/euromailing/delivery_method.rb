@@ -12,6 +12,15 @@ module Euromailing
   class DeliveryMethod
     class DeliveryError < Euromailing::Error; end
 
+    # Zet dit als gewone mailer-header met een JSON-object erin, dan komt het
+    # als `metadata` mee en geeft Euromailing het verbatim terug in de bounce-
+    # en complaint-webhooks:
+    #
+    #   headers["X-Euromailing-Metadata"] = { account_id: 42 }.to_json
+    #
+    # De header zelf wordt niet meegestuurd; alleen de inhoud, als object.
+    METADATA_HEADER = "X-Euromailing-Metadata".freeze
+
     attr_reader :settings
 
     def initialize(settings = {})
@@ -37,7 +46,8 @@ module Euromailing
         html_body:   body_part(mail, "text/html"),
         text_body:   body_part(mail, "text/plain"),
         reply_to:    mail[:reply_to]&.to_s,
-        attachments: serialized_attachments(mail)
+        attachments: serialized_attachments(mail),
+        metadata:    metadata_from(mail)
       )
     end
 
@@ -52,6 +62,18 @@ module Euromailing
       else
         Euromailing.client
       end
+    end
+
+    # Een onleesbare of ontbrekende header mag een verzending nooit tegenhouden;
+    # dan gaat de mail gewoon zonder metadata de deur uit.
+    def metadata_from(mail)
+      ruw = mail[METADATA_HEADER]&.to_s
+      return nil if ruw.nil? || ruw.empty?
+
+      waarde = JSON.parse(ruw)
+      waarde.is_a?(Hash) ? waarde : nil
+    rescue JSON::ParserError
+      nil
     end
 
     def body_part(mail, mime_type)

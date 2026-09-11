@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+- `metadata` wordt nu meegestuurd bij een transactionele verzending. Zet
+  `headers["X-Euromailing-Metadata"]` op een JSON-object in je mailer en de
+  gem geeft het door als het `metadata`-veld van de API; Euromailing geeft
+  het verbatim terug in de bounce- en complaint-webhooks. Zonder dit was een
+  bounce niet aan een eigen record te koppelen: de `id` uit de verzendrespons
+  is de RFC Message-ID, terwijl de `message_id` in een webhook de interne
+  queue-id van de mailserver is.
+- `Client#deliver_transactional` accepteert daarvoor een `metadata:`-argument.
+  Een onleesbare header houdt een verzending nooit tegen; de mail gaat dan
+  zonder metadata weg.
+
 ## 0.2.0
 
 - Sending-domain management for partner integrations (one account, many

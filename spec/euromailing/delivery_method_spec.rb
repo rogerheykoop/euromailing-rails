@@ -41,6 +41,37 @@ RSpec.describe Euromailing::DeliveryMethod do
     expect(stub).to have_been_requested
   end
 
+  it "passes X-Euromailing-Metadata through as the metadata object" do
+    mail.header["X-Euromailing-Metadata"] = { "account_id" => 42 }.to_json
+
+    stub = stub_request(:post, "https://euromailing.com/api/v1/transactional_emails")
+      .with { |req| JSON.parse(req.body)["metadata"] == { "account_id" => 42 } }
+      .to_return(status: 202, body: "{}")
+
+    described_class.new.deliver!(mail)
+    expect(stub).to have_been_requested
+  end
+
+  it "omits metadata when the header is absent" do
+    stub = stub_request(:post, "https://euromailing.com/api/v1/transactional_emails")
+      .with { |req| !JSON.parse(req.body).key?("metadata") }
+      .to_return(status: 202, body: "{}")
+
+    described_class.new.deliver!(mail)
+    expect(stub).to have_been_requested
+  end
+
+  it "still delivers when the metadata header is not valid JSON" do
+    mail.header["X-Euromailing-Metadata"] = "niet-json"
+
+    stub = stub_request(:post, "https://euromailing.com/api/v1/transactional_emails")
+      .with { |req| !JSON.parse(req.body).key?("metadata") }
+      .to_return(status: 202, body: "{}")
+
+    described_class.new.deliver!(mail)
+    expect(stub).to have_been_requested
+  end
+
   it "encodes attachments" do
     mail.add_file filename: "invoice.pdf", content: "%PDF-fake"
     stub = stub_request(:post, "https://euromailing.com/api/v1/transactional_emails")
