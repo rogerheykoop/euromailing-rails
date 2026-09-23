@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2
+
+- De delivery method weigert nu mail met cc of bcc met een `DeliveryError`.
+  De API kent geen cc of bcc, en tot nu toe vielen die adressen stil weg: een
+  kopie waar de mailer om vroeg kwam nooit aan en niemand merkte het. Stuur
+  een kopie als eigen bericht.
+- `DeliveryMethod#initialize` kopieert zijn settings. ActionMailer geeft elke
+  instantie dezelfde gedeelde hash (`ActionMailer::Base.euromailing_settings`),
+  en exception_notification doet `merge!` op `mail.delivery_method.settings`.
+  Een eigen `api_key` voor de notifier belandde zo in die gedeelde hash, en
+  daarna verstuurde elke mail van de app met die sleutel.
+
 ## 0.2.1
 
 - `metadata` wordt nu meegestuurd bij een transactionele verzending. Zet

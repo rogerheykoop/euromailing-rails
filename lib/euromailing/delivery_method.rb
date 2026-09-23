@@ -23,8 +23,13 @@ module Euromailing
 
     attr_reader :settings
 
+    # A copy, because ActionMailer hands every instance the one shared
+    # class-level hash (ActionMailer::Base.euromailing_settings), and
+    # callers such as exception_notification merge! into
+    # mail.delivery_method.settings. Without the dup a per-mailer api_key
+    # leaks into that shared hash and every later mail sends with it.
     def initialize(settings = {})
-      @settings = settings || {}
+      @settings = (settings || {}).dup
     end
 
     def deliver!(mail)
@@ -37,6 +42,15 @@ module Euromailing
       unless recipients.size == 1
         raise DeliveryError,
               "Euromailing transactional mail takes exactly one recipient per message (got #{recipients.size})"
+      end
+
+      # The API has no cc or bcc. Dropping them silently means a copy that
+      # the mailer asked for never arrives and nobody finds out, so refuse
+      # instead: send the copy as its own message.
+      copies = Array(mail.cc) + Array(mail.bcc)
+      unless copies.empty?
+        raise DeliveryError,
+              "Euromailing transactional mail has no cc or bcc (got #{copies.join(', ')}); send each copy as its own message"
       end
 
       client.deliver_transactional(

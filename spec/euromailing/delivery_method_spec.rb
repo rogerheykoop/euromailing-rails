@@ -105,6 +105,24 @@ RSpec.describe Euromailing::DeliveryMethod do
       .to raise_error(Euromailing::DeliveryMethod::DeliveryError, /exactly one recipient/)
   end
 
+  it "refuses mail with a bcc instead of dropping the copy" do
+    mail.bcc = "copy@example.com"
+    expect { described_class.new.deliver!(mail) }
+      .to raise_error(Euromailing::DeliveryMethod::DeliveryError, /no cc or bcc.*copy@example\.com/)
+  end
+
+  it "refuses mail with a cc" do
+    mail.cc = "copy@example.com"
+    expect { described_class.new.deliver!(mail) }
+      .to raise_error(Euromailing::DeliveryMethod::DeliveryError, /no cc or bcc/)
+  end
+
+  it "does not let a merge! into its settings leak into the hash it was given" do
+    shared = {}
+    described_class.new(shared).settings.merge!(api_key: "notifier_key")
+    expect(shared).to be_empty
+  end
+
   it "handles bare text-only mail" do
     simple = Mail.new(from: "noreply@app.example.com", to: "user@example.com",
                       subject: "hi", body: "just text")
